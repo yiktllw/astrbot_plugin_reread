@@ -15,6 +15,7 @@
 
 ## ⌨️ 配置
 请前往插件配置面板进行配置
+![tmp8498](https://github.com/user-attachments/assets/11b1afa6-371f-4b66-a5cc-14a8b4b2037d)
 
 
 ## 📌 注意事项
