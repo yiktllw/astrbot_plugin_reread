@@ -1,0 +1,51 @@
+{
+    "require_different_people": {
+        "description": "是否要求消息要来自不同人才复读",
+        "type": "bool",
+        "hint": "可防止单个人恶意引导复读，如广告哥",
+        "default": true
+    },
+    "repeat_probability": {
+        "description": "复读概率",
+        "type": "float",
+        "hint": "复读条件满足后，bot也进行复读的概率",
+        "default": 0.9
+    },
+    "thresholds": {
+        "description": "复读阈值设置",
+        "type": "object",
+        "hint": "阈值太低容易导致刷屏，太高则难以触发复读",
+        "items": {
+            "Plain": {
+                "description": "文本复读阈值",
+                "type": "int",
+                "hint": "需要重复几条文本才复读",
+                "default": 3
+            },
+            "Image": {
+                "description": "图片复读阈值",
+                "type": "int",
+                "hint": "需要重复几张图片才复读",
+                "default": 3
+            },
+            "Face": {
+                "description": "表情复读阈值",
+                "type": "int",
+                "hint": "需要重复几个QQ表情才复读",
+                "default": 2
+            },
+            "At": {
+                "description": "@复读阈值",
+                "type": "int",
+                "hint": "需要重复几次@才复读",
+                "default": 2
+            }
+        }
+    },
+    "banned_words": {
+        "description": "违禁词",
+        "type": "list",
+        "hint": "消息文本中含有违禁词时，终止复读，可防止复读一些危险言论",
+        "default": ["免费", "广告","操", "赌", "政", "党"]
+    }
+}
