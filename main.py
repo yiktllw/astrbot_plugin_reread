@@ -19,10 +19,10 @@ class RereadPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.require_different_people: bool = config.get('require_different_people') # 是否要求消息要来自不同人才复读
-        self.repeat_probability: float = config.get('repeat_probability')  # 复读概率
-        self.thresholds: Dict = config.get('thresholds',{}) # 各消息类型的复读阈值
         self.banned_words: str = config.get('banned_words')  # 违禁词
-        self.bot_id:str =''
+        self.thresholds: Dict = config.get('thresholds',{}) # 各消息类型的复读阈值
+        self.supported_type: list = list(self.thresholds.keys())
+        self.repeat_probability: float = config.get('repeat_probability')  # 复读概率
 
 
     @filter.event_message_type(EventMessageType.ALL)
@@ -35,8 +35,21 @@ class RereadPlugin(Star):
                 return
 
         chain = event.get_messages()
+        if not chain:
+            return
+
+        # 取第一个消息段判断消息类型是否支持
         first_seg = chain[0]
-        seg_type = str(first_seg.type) # 只取第一个消息段进行判断
+        seg_type = str(first_seg.type)
+        if seg_type not in self.supported_type:
+            return
+
+        # 不复读@bot开头的消息
+        if isinstance(first_seg, Comp.At):
+            self_id = event.get_self_id()
+            if first_seg.qq == self_id:
+                return
+
         group_id = event.get_group_id()
         send_id = event.get_sender_id()
         self.bot_id = event.get_self_id()
@@ -55,10 +68,7 @@ class RereadPlugin(Star):
         # 如果群组 ID 不在 msg_dict 中，初始化一个 deque 对象，最大长度为各自的阈值
         if group_id not in messages_dict:
             messages_dict[group_id] = {
-                "Plain": deque(maxlen=self.thresholds.get('Plain')),
-                "Image": deque(maxlen=self.thresholds.get('Image')),
-                "Face": deque(maxlen=self.thresholds.get('Face')),
-                "At": deque(maxlen=self.thresholds.get('At'))
+                key: deque(maxlen=self.thresholds.get(key)) for key in self.supported_type
             }
 
         # 获取该群组的消息记录
@@ -103,7 +113,7 @@ class RereadPlugin(Star):
             if seg.id == seg2.id:
                 return True
         if isinstance(seg, Comp.At):
-            if seg.qq == seg2.qq and str(seg.qq) != self.bot_id:
+            if seg.qq == seg2.qq:
                 return True
         return False
 
