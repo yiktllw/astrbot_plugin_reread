@@ -22,6 +22,7 @@ class RereadPlugin(Star):
         self.repeat_probability: float = config.get('repeat_probability')  # 复读概率
         self.thresholds: Dict = config.get('thresholds',{}) # 各消息类型的复读阈值
         self.banned_words: str = config.get('banned_words')  # 违禁词
+        self.bot_id:str =''
 
 
     @filter.event_message_type(EventMessageType.ALL)
@@ -38,6 +39,7 @@ class RereadPlugin(Star):
         seg_type = str(first_seg.type) # 只取第一个消息段进行判断
         group_id = event.get_group_id()
         send_id = event.get_sender_id()
+        self.bot_id = event.get_self_id()
 
         global messages_dict
 
@@ -55,8 +57,8 @@ class RereadPlugin(Star):
             messages_dict[group_id] = {
                 "Plain": deque(maxlen=self.thresholds.get('Plain')),
                 "Image": deque(maxlen=self.thresholds.get('Image')),
-                "Face": deque(maxlen=self.thresholds.get('Image')),
-                "At": deque(maxlen=self.thresholds.get('Image'))
+                "Face": deque(maxlen=self.thresholds.get('Face')),
+                "At": deque(maxlen=self.thresholds.get('At'))
             }
 
         # 获取该群组的消息记录
@@ -82,8 +84,7 @@ class RereadPlugin(Star):
             msg_list.clear()
 
 
-    @staticmethod
-    def is_equal(chain: list[Comp.BaseMessageComponent], chain2: list[Comp.BaseMessageComponent]):
+    def is_equal(self, chain: list[Comp.BaseMessageComponent], chain2: list[Comp.BaseMessageComponent]):
         """判断两条消息链是否满足相等条件"""
         if len(chain) != len(chain2):
             return False
@@ -102,7 +103,7 @@ class RereadPlugin(Star):
             if seg.id == seg2.id:
                 return True
         if isinstance(seg, Comp.At):
-            if seg.qq == seg2.qq:
+            if seg.qq == seg2.qq and str(seg.qq) != self.bot_id:
                 return True
         return False
 

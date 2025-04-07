@@ -1,6 +1,6 @@
 name: astrbot_plugin_reread # 这是你的插件的唯一识别名。
 desc: 不依赖任何数据库的群聊复读姬，可单独设置文本、图片、表情、At消息的复读阈值，可设置复读概率，可要求消息要来自不同人，可设置违禁词 # 插件简短描述
 help: 略  # 插件的帮助信息
-version: v1.0.0 # 插件版本号。格式：v1.1.1 或者 v1.1
+version: v1.0.1 # 插件版本号。格式：v1.1.1 或者 v1.1
 author: Zhalslar # 作者
 repo: https://github.com/Zhalslar/astrbot_plugin_reread # 插件的仓库地址
