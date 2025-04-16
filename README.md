@@ -46,5 +46,5 @@ git clone https://github.com/Zhalslar/astrbot_plugin_QQAdmin
 
 ## 📌 注意事项
 
-- 本插件目前仅测试了napcat协议端，其他协议端可能会存在一些不兼容问题（以具体情况为准）
+- 注意复读阈值不要调太低，容易刷屏
 - 想第一时间得到反馈的可以来作者的插件反馈群（QQ群）：460973561
