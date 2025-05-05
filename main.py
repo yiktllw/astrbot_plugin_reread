@@ -21,49 +21,22 @@ from astrbot.core.star.filter.event_message_type import EventMessageType
 class RereadPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        # 是否要求消息要来自不同人才复读
         self.require_different_people: bool = config.get(
             "require_different_people", False
-        )  # 是否要求消息要来自不同人才复读
-        self.banned_words: str = config.get("banned_words", [])  # 违禁词
-        self.thresholds: Dict = config.get("thresholds", {})  # 各消息类型的复读阈值
+        )
+        # 违禁词
+        self.banned_words: str = config.get("banned_words", [])
+        # 各消息类型的复读阈值
+        self.thresholds: Dict = config.get("thresholds", {})
+        # 支持的消息类型
         self.supported_type: list = list(self.thresholds.keys())
-        self.repeat_probability: float = config.get(
-            "repeat_probability", 0.5
-        )  # 复读概率
-        self.messages_dict = {}  # 使用字典存储每个群组的消息记录，值为 deque 对象
-        self.bot_id: str = ""
-
-    @filter.event_message_type(EventMessageType.ALL)
-    async def reread_handle(self, event: AstrMessageEvent):
-        """复读处理函数"""
-        # 如果消息包含违禁词，则不进行复读
-        message_str = event.get_message_str()
-        for word in self.banned_words:
-            if word in message_str:
-                return
-
-        chain = event.get_messages()
-        if not chain:
-            return
-
-        # 取第一个消息段判断消息类型是否支持
-        first_seg = chain[0]
-        seg_type = str(first_seg.type)
-        if seg_type not in self.supported_type:
-            return
-
-        # 不复读@bot开头的消息
-        if isinstance(first_seg, Comp.At):
-            self_id = event.get_self_id()
-            if first_seg.qq == self_id:
-                return
-
-        group_id = event.get_group_id()
-        send_id = event.get_sender_id()
-        self.bot_id = event.get_self_id()
-
+        # 复读概率
+        self.repeat_probability: float = config.get("repeat_probability", 0.5)
+        # 使用字典存储每个群组的消息记录，值为 deque 对象
+        self.messages_dict = {}
         """
-        msg_dict = {
+        messages_dict = {
             "group_id": {
                 "seg_type": [
                     {"send_id": send_id, "chain": chain}
@@ -71,6 +44,33 @@ class RereadPlugin(Star):
             }
         }
         """
+
+    @filter.event_message_type(EventMessageType.ALL)
+    async def reread_handle(self, event: AstrMessageEvent):
+        """复读处理函数"""
+        chain = event.get_messages()
+        if not chain:
+            return
+
+        for seg in chain:
+            # 过滤@bot的消息
+            if isinstance(seg, Comp.At) and str(seg.qq) == event.get_self_id():
+                return
+            # 过滤违禁词
+            elif isinstance(seg, Comp.Plain) and self.banned_words:
+                for word in self.banned_words:
+                    if word in seg.text:
+                        return
+
+        # 取第一个消息段判断消息类型是否支持
+        first_seg = chain[0]
+        seg_type = str(first_seg.type)
+        if seg_type not in self.supported_type:
+            return
+
+        group_id = event.get_group_id()
+        send_id = event.get_sender_id()
+
         # 如果群组 ID 不在 msg_dict 中，初始化一个 deque 对象，最大长度为各自的阈值
         if group_id not in self.messages_dict:
             self.messages_dict[group_id] = {
@@ -125,6 +125,6 @@ class RereadPlugin(Star):
             return seg1.id == seg2.id
 
         if isinstance(seg1, Comp.At) and isinstance(seg2, Comp.At):
-            return seg1.qq == seg2.qq and seg1 != self.bot_id
+            return seg1.qq == seg2.qq
 
         return False
