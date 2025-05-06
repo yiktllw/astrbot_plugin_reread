@@ -1,9 +1,11 @@
+import asyncio
 from typing import Dict
 
 from astrbot.api.event import filter
 from astrbot.api.star import Context, Star, register
 from astrbot.core import AstrBotConfig
 import astrbot.core.message.components as Comp
+from astrbot.core.message.message_event_result import MessageChain
 from astrbot.core.platform import AstrMessageEvent
 import random
 from collections import deque
@@ -15,7 +17,7 @@ from astrbot.core.star.filter.event_message_type import EventMessageType
     "astrbot_plugin_reread",
     "Zhalslar",
     "复读插件",
-    "1.0.3",
+    "1.0.5",
     "https://github.com/Zhalslar/astrbot_plugin_reread",
 )
 class RereadPlugin(Star):
@@ -33,7 +35,15 @@ class RereadPlugin(Star):
         self.supported_type: list = list(self.thresholds.keys())
         # 复读概率
         self.repeat_probability: float = config.get("repeat_probability", 0.5)
-        # 使用字典存储每个群组的消息记录，值为 deque 对象
+        # 打断复读概率
+        self.interrupt_probability: float = config.get("interrupt_probability", 0.1)
+        # 复读冷却时间（秒）
+        self.cooldown_seconds = config.get("cooldown_seconds", 30)
+        # 存储每个群组的上一次复读的时间点
+        self.repeat_cooldowns = {}  # {group_id: timestamp}
+        # 存储每个群组的lock
+        self.group_locks = {}
+        # 存储每个群组的消息记录，值为 deque 对象
         self.messages_dict = {}
         """
         messages_dict = {
@@ -44,6 +54,11 @@ class RereadPlugin(Star):
             }
         }
         """
+
+    async def get_group_lock(self, group_id):
+        if group_id not in self.group_locks:
+            self.group_locks[group_id] = asyncio.Lock()
+        return self.group_locks[group_id]
 
     @filter.event_message_type(EventMessageType.ALL)
     async def reread_handle(self, event: AstrMessageEvent):
@@ -71,38 +86,57 @@ class RereadPlugin(Star):
         group_id = event.get_group_id()
         send_id = event.get_sender_id()
 
-        # 如果群组 ID 不在 msg_dict 中，初始化一个 deque 对象，最大长度为各自的阈值
-        if group_id not in self.messages_dict:
-            self.messages_dict[group_id] = {
-                key: deque(maxlen=self.thresholds.get(key))
-                for key in self.supported_type
-            }
+        # 获取当前群组的锁
+        lock = await self.get_group_lock(group_id)
+        async with lock:  # 加锁，防止并发
 
-        # 获取该群组的消息记录
-        group_messages = self.messages_dict[group_id]
-        msg_list = group_messages[seg_type]
+            # 如果群组 ID 不在 msg_dict 中，初始化一个 deque 对象，最大长度为各自的阈值
+            if group_id not in self.messages_dict:
+                self.messages_dict[group_id] = {
+                    key: deque(maxlen=self.thresholds.get(key))
+                    for key in self.supported_type
+                }
 
-        # 检查消息是否来自同一个用户, 如果来自同一个用户，清空消息记录
-        if (
-            self.require_different_people
-            and msg_list
-            and msg_list[-1]["send_id"] == send_id
-        ):
-            msg_list.clear()
+            # 获取该群组的消息记录
+            group_messages = self.messages_dict[group_id]
+            msg_list = group_messages[seg_type]
 
-        # 将当前消息和用户ID添加到该群组的消息记录中
-        msg_list.append({"send_id": send_id, "chain": chain})
+            # 检查消息是否来自同一个用户, 如果来自同一个用户，清空消息记录
+            if (
+                self.require_different_people
+                and msg_list
+                and msg_list[-1]["send_id"] == send_id
+            ):
+                msg_list.clear()
 
-        # 如果该群组的消息记录中有 threshold 条消息，并且满足复读概率，则复读
-        if (
-            len(msg_list) >= self.thresholds.get(seg_type, 3)
-            and random.random() < self.repeat_probability
-            and all(
-                self.is_equal(msg_list[0]["chain"], msg["chain"]) for msg in msg_list
-            )
-        ):
-            yield event.chain_result(chain)
-            msg_list.clear()
+            # 将当前消息和用户ID添加到该群组的消息记录中
+            msg_list.append({"send_id": send_id, "chain": chain})
+
+            # 获取当前时间
+            msg_time = event.message_obj.timestamp
+
+            # 检查是否处于冷却期
+            if group_id in self.repeat_cooldowns:
+                last_time = self.repeat_cooldowns[group_id]
+                if msg_time - last_time < self.cooldown_seconds:
+                    return
+
+            # 如果该群组的消息记录中有 threshold 条消息，并且满足复读概率，则复读
+            if (
+                len(msg_list) >= self.thresholds.get(seg_type, 3)
+                and random.random() < self.repeat_probability
+                and all(
+                    self.is_equal(msg_list[0]["chain"], msg["chain"]) for msg in msg_list
+                )
+            ):
+                # 打断复读机制
+                if random.random() < self.interrupt_probability:
+                    chain = [Comp.Plain("打断！")]
+
+                await event.send(MessageChain(chain=chain)) # type: ignore
+                msg_list.clear()
+                self.repeat_cooldowns[group_id] = msg_time
+                event.stop_event()
 
     def is_equal(
         self,
