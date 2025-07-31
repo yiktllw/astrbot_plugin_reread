@@ -1,4 +1,10 @@
 {
+    "reread_group_whitelist": {
+        "description": "复读群聊白名单",
+        "type": "list",
+        "hint": "仅在这些群里启用复读功能，留空表示全部群聊启用",
+        "default": []
+    },
     "require_different_people": {
         "description": "是否要求消息要来自不同人才复读",
         "type": "bool",

@@ -17,12 +17,13 @@ from astrbot.core.star.filter.event_message_type import EventMessageType
     "astrbot_plugin_reread",
     "Zhalslar",
     "复读插件",
-    "1.0.5",
+    "v1.1.0",
     "https://github.com/Zhalslar/astrbot_plugin_reread",
 )
 class RereadPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        self.reread_group_whitelist = config.get("reread_group_whitelist", [])
         # 是否要求消息要来自不同人才复读
         self.require_different_people: bool = config.get(
             "require_different_people", False
@@ -60,9 +61,12 @@ class RereadPlugin(Star):
             self.group_locks[group_id] = asyncio.Lock()
         return self.group_locks[group_id]
 
-    @filter.event_message_type(EventMessageType.ALL)
+    @filter.event_message_type(EventMessageType.GROUP_MESSAGE)
     async def reread_handle(self, event: AstrMessageEvent):
         """复读处理函数"""
+        group_id = event.get_group_id()
+        if self.reread_group_whitelist and group_id not in self.reread_group_whitelist:
+            return
         chain = event.get_messages()
         if not chain:
             return
@@ -83,9 +87,6 @@ class RereadPlugin(Star):
         if seg_type not in self.supported_type:
             return
 
-        group_id = event.get_group_id()
-        send_id = event.get_sender_id()
-
         # 获取当前群组的锁
         lock = await self.get_group_lock(group_id)
         async with lock:  # 加锁，防止并发
@@ -102,6 +103,7 @@ class RereadPlugin(Star):
             msg_list = group_messages[seg_type]
 
             # 检查消息是否来自同一个用户, 如果来自同一个用户，清空消息记录
+            send_id = event.get_sender_id()
             if (
                 self.require_different_people
                 and msg_list
