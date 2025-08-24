@@ -17,7 +17,7 @@ from astrbot.core.star.filter.event_message_type import EventMessageType
     "astrbot_plugin_reread",
     "Zhalslar",
     "复读插件",
-    "v1.1.0",
+    "v1.1.1",
     "https://github.com/Zhalslar/astrbot_plugin_reread",
 )
 class RereadPlugin(Star):
@@ -64,22 +64,21 @@ class RereadPlugin(Star):
     @filter.event_message_type(EventMessageType.GROUP_MESSAGE)
     async def reread_handle(self, event: AstrMessageEvent):
         """复读处理函数"""
+        # 过滤唤醒bot的消息
+        if event.is_at_or_wake_command or event.is_wake_up():
+            return
+        # 群白名单
         group_id = event.get_group_id()
         if self.reread_group_whitelist and group_id not in self.reread_group_whitelist:
             return
+        # 过滤空消息
         chain = event.get_messages()
         if not chain:
             return
-
-        for seg in chain:
-            # 过滤@bot的消息
-            if isinstance(seg, Comp.At) and str(seg.qq) == event.get_self_id():
+        # 过滤违禁词
+        for word in self.banned_words:
+            if word in event.message_str:
                 return
-            # 过滤违禁词
-            elif isinstance(seg, Comp.Plain) and self.banned_words:
-                for word in self.banned_words:
-                    if word in seg.text:
-                        return
 
         # 取第一个消息段判断消息类型是否支持
         first_seg = chain[0]
