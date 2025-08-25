@@ -17,7 +17,7 @@ from astrbot.core.star.filter.event_message_type import EventMessageType
     "astrbot_plugin_reread",
     "Zhalslar",
     "复读插件",
-    "v1.1.1",
+    "v1.1.2",
     "https://github.com/Zhalslar/astrbot_plugin_reread",
 )
 class RereadPlugin(Star):
@@ -65,7 +65,7 @@ class RereadPlugin(Star):
     async def reread_handle(self, event: AstrMessageEvent):
         """复读处理函数"""
         # 过滤唤醒bot的消息
-        if event.is_at_or_wake_command or event.is_wake_up():
+        if event.is_at_or_wake_command:
             return
         # 群白名单
         group_id = event.get_group_id()
@@ -89,7 +89,6 @@ class RereadPlugin(Star):
         # 获取当前群组的锁
         lock = await self.get_group_lock(group_id)
         async with lock:  # 加锁，防止并发
-
             # 如果群组 ID 不在 msg_dict 中，初始化一个 deque 对象，最大长度为各自的阈值
             if group_id not in self.messages_dict:
                 self.messages_dict[group_id] = {
@@ -127,14 +126,15 @@ class RereadPlugin(Star):
                 len(msg_list) >= self.thresholds.get(seg_type, 3)
                 and random.random() < self.repeat_probability
                 and all(
-                    self.is_equal(msg_list[0]["chain"], msg["chain"]) for msg in msg_list
+                    self.is_equal(msg_list[0]["chain"], msg["chain"])
+                    for msg in msg_list
                 )
             ):
                 # 打断复读机制
                 if random.random() < self.interrupt_probability:
                     chain = [Comp.Plain("打断！")]
 
-                await event.send(MessageChain(chain=chain)) # type: ignore
+                await event.send(MessageChain(chain=chain))  # type: ignore
                 msg_list.clear()
                 self.repeat_cooldowns[group_id] = msg_time
                 event.stop_event()
