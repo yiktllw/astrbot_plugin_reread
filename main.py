@@ -18,7 +18,7 @@ from astrbot.core.star.filter.event_message_type import EventMessageType
     "astrbot_plugin_reread",
     "Zhalslar",
     "复读插件",
-    "v1.2.1",
+    "v1.2.2",
     "https://github.com/Zhalslar/astrbot_plugin_reread",
 )
 class RereadPlugin(Star):
@@ -32,7 +32,12 @@ class RereadPlugin(Star):
         # 违禁词
         self.banned_words: str = config.get("banned_words", [])
         # 各消息类型的复读阈值
-        self.thresholds: Dict = config.get("thresholds", {})
+        self.thresholds: Dict = config.get("thresholds", {
+            "Plain": 3,
+            "Image": 3, 
+            "Face": 2,
+            "At": 3
+        })
         # 支持的消息类型
         self.supported_type: list = list(self.thresholds.keys())
         # 复读概率
@@ -83,6 +88,7 @@ class RereadPlugin(Star):
             self.logger.debug(f"配置信息: 群聊白名单={self.reread_group_whitelist}, "
                            f"需要不同用户={self.require_different_people}, "
                            f"阈值设置={self.thresholds}, "
+                           f"支持的消息类型={self.supported_type}, "
                            f"复读概率={self.repeat_probability}, "
                            f"单条复读={self.enable_single_repeat}({self.single_repeat_probability}), "
                            f"打断概率={self.interrupt_probability}, "
@@ -138,7 +144,12 @@ class RereadPlugin(Star):
 
         # 取第一个消息段判断消息类型是否支持
         first_seg = chain[0]
-        seg_type = str(first_seg.type)
+        seg_type_raw = str(first_seg.type)
+        # 提取类型名称，去掉 ComponentType. 前缀
+        seg_type = seg_type_raw.replace("ComponentType.", "") if "ComponentType." in seg_type_raw else seg_type_raw
+        
+        self.debug_log(f"群 {group_id}: 原始消息类型: {seg_type_raw}, 处理后类型: {seg_type}")
+        
         if seg_type not in self.supported_type:
             self.debug_log(f"群 {group_id}: 消息类型 '{seg_type}' 不支持，跳过处理")
             return
