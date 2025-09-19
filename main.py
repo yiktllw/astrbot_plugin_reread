@@ -17,7 +17,7 @@ from astrbot.core.star.filter.event_message_type import EventMessageType
     "astrbot_plugin_reread",
     "Zhalslar",
     "复读插件",
-    "v1.1.2",
+    "v1.2.0",
     "https://github.com/Zhalslar/astrbot_plugin_reread",
 )
 class RereadPlugin(Star):
@@ -38,6 +38,10 @@ class RereadPlugin(Star):
         self.repeat_probability: float = config.get("repeat_probability", 0.5)
         # 打断复读概率
         self.interrupt_probability: float = config.get("interrupt_probability", 0.1)
+        # 启用单条复读
+        self.enable_single_repeat: bool = config.get("enable_single_repeat", False)
+        # 单条复读概率
+        self.single_repeat_probability: float = config.get("single_repeat_probability", 0.05)
         # 复读冷却时间（秒）
         self.cooldown_seconds = config.get("cooldown_seconds", 30)
         # 存储每个群组的上一次复读的时间点
@@ -89,6 +93,26 @@ class RereadPlugin(Star):
         # 获取当前群组的锁
         lock = await self.get_group_lock(group_id)
         async with lock:  # 加锁，防止并发
+            # 获取当前时间
+            msg_time = event.message_obj.timestamp
+
+            # 检查是否处于冷却期
+            if group_id in self.repeat_cooldowns:
+                last_time = self.repeat_cooldowns[group_id]
+                if msg_time - last_time < self.cooldown_seconds:
+                    return
+
+            # 单条复读逻辑：如果启用了单条复读，按概率直接复读
+            if self.enable_single_repeat and random.random() < self.single_repeat_probability:
+                # 打断复读机制
+                if random.random() < self.interrupt_probability:
+                    chain = [Comp.Plain("打断！")]
+                
+                await event.send(MessageChain(chain=chain))  # type: ignore
+                self.repeat_cooldowns[group_id] = msg_time
+                event.stop_event()
+                return
+
             # 如果群组 ID 不在 msg_dict 中，初始化一个 deque 对象，最大长度为各自的阈值
             if group_id not in self.messages_dict:
                 self.messages_dict[group_id] = {
@@ -111,15 +135,6 @@ class RereadPlugin(Star):
 
             # 将当前消息和用户ID添加到该群组的消息记录中
             msg_list.append({"send_id": send_id, "chain": chain})
-
-            # 获取当前时间
-            msg_time = event.message_obj.timestamp
-
-            # 检查是否处于冷却期
-            if group_id in self.repeat_cooldowns:
-                last_time = self.repeat_cooldowns[group_id]
-                if msg_time - last_time < self.cooldown_seconds:
-                    return
 
             # 如果该群组的消息记录中有 threshold 条消息，并且满足复读概率，则复读
             if (

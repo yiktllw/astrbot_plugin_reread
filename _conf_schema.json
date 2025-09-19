@@ -48,6 +48,18 @@
         "hint": "到达复读阈值后，进行复读的概率，设小一些可有效防止频繁复读",
         "default": 0.8
     },
+    "enable_single_repeat": {
+        "description": "启用单条复读",
+        "type": "bool",
+        "hint": "启用后，收到消息时会按概率直接复读，无需达到阈值",
+        "default": false
+    },
+    "single_repeat_probability": {
+        "description": "单条复读概率",
+        "type": "float",
+        "hint": "收到消息后直接复读的概率，建议设置较小的值（如0.05）以避免过于频繁",
+        "default": 0.05
+    },
     "interrupt_probability": {
         "description": "打断复读概率",
         "type": "float",
